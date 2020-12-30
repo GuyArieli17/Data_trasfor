@@ -1,13 +1,10 @@
 from socket import *
-from termcolor import cprint
+#  from termcolor import cprint
 from threading import *
 from getch import *
 import sys
 from select import select
 from struct import *
-from concurrent.futures import ThreadPoolExecutor
-from time import *
-from threading import *
 import scapy.all as scapy
 
 DEV = 'eth1'
@@ -16,7 +13,7 @@ MAX_BYTE = 2028
 FORMAT = 'utf-8'
 DISCONNECT_MSG = 'DISCONNECT!'
 DEFAULT_PORT = 13117
-SERVER_IP = scapy.get_if_addr(TEST)#'172.1.0.107'
+SERVER_IP =gethostbyname(gethostname()) #scapy.get_if_addr(DEV)
 MAGIC_COOKIE = 0xfeedbeef
 MESSAGE_TYPE = 2
 DICT_THEME = {
@@ -27,7 +24,6 @@ DICT_THEME = {
     'game': ('cyan', 'on_grey'),
     'default': ('grey', 'on_white'),
 }
-
 class bcolors:
     HEADER = '\033[95m'
     OKBLUE = '\033[94m'
@@ -39,20 +35,20 @@ class bcolors:
     BOLD = '\033[1m'
     UNDERLINE = '\033[4m'
 
-
 class client:
 
     def print_in_theme(self, msg, kind):
-        color = ''
-        background = ''
-        if kind not in DICT_THEME.keys():
-            color, background = DICT_THEME['default']
-        else:
-            color, background = DICT_THEME[kind]
-        cprint(msg, color, background)
+        # color = ''
+        # background = ''
+        # if kind not in DICT_THEME.keys():
+        #     color, background = DICT_THEME['default']
+        # else:
+        #     color, background = DICT_THEME[kind]
+        # cprint(msg, color, background)
+        print(f'{bcolors.OKCYAN} {msg}{bcolors.ENDC}')
 
-    def _init_(self, PORT, NAME):
-        self.addr = (SERVER_IP, PORT) #gethostbyname(gethostname())
+    def __init__(self, PORT, NAME):
+        self.addr = (gethostbyname(gethostname()), PORT)
         self.name = NAME
         self.waiting_lock = Lock()
         self.closing_lock = Lock()
@@ -68,7 +64,7 @@ class client:
             msg_byte, addr = udp_socket.recvfrom(MAX_BYTE)
             try:
                 magic_cookie, message_type, tcp_port = unpack('!IbH', msg_byte)
-                if magic_cookie == MAGIC_COOKIE and message_type == MESSAGE_TYPE:
+                if magic_cookie == MAGIC_COOKIE and message_type == MESSAGE_TYPE and addr[0] == SERVER_IP:
                     finsih_loop = True
                     udp_socket.close()
                     self.connect_via_tcp((addr[0], tcp_port))
@@ -79,7 +75,6 @@ class client:
         con_bol = True
         tcp_socket = socket(AF_INET, SOCK_STREAM)
         try:
-            print(f'[Client] connection time {time()}')
             tcp_socket.connect(server_addr)
         except Exception as e:
             print(e)
@@ -118,7 +113,6 @@ class client:
                 socket.send(input_key.encode(FORMAT))
             except:
                 pass
-            sleep(0.01)
         self.closing_lock.release()
 
 
