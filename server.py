@@ -1,18 +1,24 @@
-from termcolor import cprint
+#  from termcolor import cprint
 from concurrent.futures import ThreadPoolExecutor
 from random import randint
 from time import *
 from socket import *
 from threading import *
+import scapy.all as scapy
+from struct import pack
 
+DEV = 'eth1'
+TEST = 'eth2'
 MAX_BYTE = 2028
 FORMAT = 'utf-8'
 DISCONNECT_MSG = 'DISCONNECT!'
-MAGIC_COOKIE = 'feedbeef'
-MESSAGE_TYPE = '02'
-WAIT_TIME = 10
+# MAGIC_COOKIE = 'feedbeef'
+# MESSAGE_TYPE = '02'
+WAIT_TIME = 5
+SERVER_PORT = 1207  # get free one
 DEFAULT_PORT = 13117
 NUMBER_OF_CLIENTS = 10
+SERVER_IP = gethostbyname(gethostname()) #scapy.get_if_addr(DEV)  # gethostbyname(gethostname())
 DICT_THEME = {
     'error': ('red', 'on_grey'),
     'connection': ('grey', 'on_magenta'),
@@ -22,15 +28,38 @@ DICT_THEME = {
     'default': ('grey', 'on_white'),
 }
 
+class bcolors:
+    """
+        Class: we use to print colors need to be in start of end
+    """
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 class keyBoardGame:
+    """
+        class: mannage all the game threads and all except sockets server deliver them
+    """
 
     def __init__(self, NUMBER_OF_CLIENTS=15, FORAMT='utf-8', MAX_BYTE=2028, game_time=10):
+        """
+        the func create the game
+        :param NUMBER_OF_CLIENTS: number of thread in thread pool
+        :param FORAMT: how we decode\encode str
+        :param MAX_BYTE: max message bytes
+        :param game_time: how much time the game will be
+        """
         self.executor = ThreadPoolExecutor(NUMBER_OF_CLIENTS)
-        self.groups_clients = {'1': [], '2': []}
-        self.client = {}
-        self.score = [0, 0]
-        self.format = FORAMT
+        self.groups_clients = {'1': [], '2': []}  # groups: players in group
+        self.client = {}  # client in the game
+        self.score = [0, 0]  # the score of each group
+        self.format = FORAMT #
         self.game_end_time = 0
         self.game_time = game_time
         self.message_size = MAX_BYTE
@@ -38,19 +67,28 @@ class keyBoardGame:
         self.best_player_tuple = (0, 'Default')  # (score, name)
 
     def reset(self, NUMBER_OF_CLIENTS=15):
+        """
+            resat the game all score and evrey thing
+        :param NUMBER_OF_CLIENTS:
+        :return:
+        """
         self.executor = ThreadPoolExecutor(NUMBER_OF_CLIENTS)
         self.groups_clients = {'1': [], '2': []}
         self.client = {}
         self.score = [0, 0]
 
     def add_client(self, addr, connection_socket, team_name):
+        """
+         add client to our game
+        :param addr: the (ip , port) of client
+        :param connection_socket:  the socket we diliver msg
+        :param team_name: the name of the client
+        :return: is in game
+        """
         group_num = randint(1, 2)
         lst = [0, 2, 1]
         if len(self.groups_clients[str(group_num)]) >= len(self.groups_clients[str(lst[group_num])]):
             group_num = lst[group_num]
-        # Todo: can delete to have more clients
-        # if len(self.groups_clients[str(group_num)]) >= 2:
-        #     return False
         self.client[addr[0]] = [addr[1], connection_socket, team_name, group_num]
         if addr[0] not in self.client.keys():
             self.client[addr[0]] = []
@@ -58,6 +96,10 @@ class keyBoardGame:
         return True
 
     def get_welcome_msg(self):
+        """
+            get teams name and client in each group and print the msg as flollow
+        :return:
+        """
         group1 = self.groups_clients['1']
         group2 = self.groups_clients['2']
         msg = "Welcome to Keyboard Spamming Battle Royale.\n"
@@ -71,20 +113,30 @@ class keyBoardGame:
         return msg
 
     def start(self):
-        self.game_end_time = time() + self.game_time
-        for ip, info_list in self.client.items():
+        """
+            the msater : manage the game
+        :return: None
+        """
+        self.game_end_time = time() + self.game_time  # set global game end time
+        for ip, info_list in self.client.items():  # start game in each thread
             player_socket = info_list[1]
             self.executor.submit(self.start_game_for_player, (ip, player_socket))
-        self.executor.shutdown(wait=True)
-        self.calculate_group_scores()
-        end_msg_byte = self.end_msg().encode(self.format)
-        self.executor = ThreadPoolExecutor(self.number_of_client)
+        self.executor.shutdown(wait=True)  # wait untill all thread in pool finish (all tasks)
+        self.calculate_group_scores() # caculate the score for each group
+        end_msg_byte = self.end_msg().encode(self.format) # create message to send to clients
+        self.executor = ThreadPoolExecutor(self.number_of_client) # create new thread pool
         for ip, info_list in self.client.items():
+            # for each player send the end msg
             player_socket = info_list[1]
             self.executor.submit(self.send_end_game_message_to_client, ip, player_socket, end_msg_byte)
-        self.executor.shutdown(wait=True)
+        self.executor.shutdown(wait=True) # wait untill all goot msg
 
     def start_game_for_player(self, player):
+        """
+
+        :param player:
+        :return:
+        """
         player_ip, player_socket = player
         distinct_key_counter = {}
         self.client[player_ip].append(distinct_key_counter)
@@ -143,21 +195,22 @@ class keyBoardGame:
     def send_end_game_message_to_client(self, client_ip, client_socket, msg):
         client_socket.send(msg)
 
-
 class server:
 
     def print_in_theme(self, msg, kind):
+        #betters colors
         color = ''
         background = ''
-        if kind not in DICT_THEME.keys():
-            color, background = DICT_THEME['default']
-        else:
-            color, background = DICT_THEME[kind]
-        cprint(msg, color, background)
+        # if kind not in DICT_THEME.keys():
+        #     color, background = DICT_THEME['default']
+        # else:
+        #     color, background = DICT_THEME[kind]
+        # cprint(msg, color, background)
+        print(f'{bcolors.OKCYAN} {msg}{bcolors.ENDC}')
 
-    def __init__(self, PORT):
+    def __init__(self):
         self.socket = socket(AF_INET, SOCK_STREAM)
-        self.addr = (gethostbyname(gethostname()), PORT)
+        self.addr = (SERVER_IP, SERVER_PORT)
         self.udp_lock = Lock()
         self.tcp_lock = Lock()
         self.client_connect_lock = Lock()
@@ -184,20 +237,23 @@ class server:
         udp_socket.setsockopt(SOL_SOCKET, SO_REUSEPORT, 1)
         udp_socket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
         udp_socket.settimeout(0.2)
-        udp_socket.bind((self.addr))
-        msg = bytes.fromhex(MAGIC_COOKIE) + bytes.fromhex(MESSAGE_TYPE) + self.addr[1].to_bytes(2,
-                                                                                                byteorder='big')  # + self.addr[0].encode(FORMAT)
+        udp_socket.bind((SERVER_IP, SERVER_PORT))
+        self.addr = udp_socket.getsockname()
+        msg = pack('!IbH', 0xfeedbeef, 2, self.addr[1])
+        # msg = bytes.fromhex(MAGIC_COOKIE) + bytes.fromhex(MESSAGE_TYPE) + self.addr[1].to_bytes(2, byteorder='big')
         self.end_time = time() + WAIT_TIME
         self.tcp_lock.release()
         while self.end_time > time():
             try:
-                udp_socket.sendto(msg, ('<broadcast>', DEFAULT_PORT))
+                udp_socket.sendto(msg, ('<broadcast>', DEFAULT_PORT)) #172.1.255.255
             except timeout:
                 pass
-                if self.end_time - time() < 0:
-                    break
-                sleep_time = 1 if self.end_time - time() > 1 else self.end_time - time()
-                sleep(sleep_time)
+            if self.end_time - time() < 0:
+                break
+            sleep_time = 1
+            if self.end_time - time() < 1:
+                sleep_time = self.end_time - time()
+            sleep(sleep_time)
         udp_socket.close()
 
     def create_connection_via_tcp(self):
@@ -235,4 +291,4 @@ class server:
             client_socket.close()
 
 
-server(1212)
+server()
