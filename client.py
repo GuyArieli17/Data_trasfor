@@ -4,6 +4,7 @@ from threading import *
 from getch import *
 import sys
 from select import select
+
 MAX_BYTE = 2028
 FORMAT = 'utf-8'
 DISCONNECT_MSG = 'DISCONNECT!'

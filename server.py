@@ -11,7 +11,7 @@ DISCONNECT_MSG = 'DISCONNECT!'
 MAGIC_COOKIE = 'feedbeef'
 MESSAGE_TYPE = '02'
 WAIT_TIME = 5
-DEFAULT_PORT = 13117
+DEFAULT_PORT = 1213
 NUMBER_OF_CLIENTS = 10
 DICT_THEME = {
                 'error': ('red', 'on_grey'),
