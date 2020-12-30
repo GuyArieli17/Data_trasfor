@@ -13,7 +13,7 @@ MAX_BYTE = 2028
 FORMAT = 'utf-8'
 DISCONNECT_MSG = 'DISCONNECT!'
 DEFAULT_PORT = 13117
-SERVER_IP =gethostbyname(gethostname()) #scapy.get_if_addr(DEV)
+SERVER_IP = scapy.get_if_addr(DEV) #gethostbyname(gethostname()) #
 MAGIC_COOKIE = 0xfeedbeef
 MESSAGE_TYPE = 2
 DICT_THEME = {
@@ -63,7 +63,7 @@ class client:
         :param PORT:
         :param NAME:
         """
-        self.addr = (gethostbyname(gethostname()), PORT) # create client addr
+        self.addr = (SERVER_IP, PORT) # create client addr
         self.name = NAME # name of client
         self.waiting_lock = Lock()
         self.closing_lock = Lock()

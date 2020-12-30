@@ -18,7 +18,7 @@ WAIT_TIME = 5
 SERVER_PORT = 1207  # get free one
 DEFAULT_PORT = 13117
 NUMBER_OF_CLIENTS = 10
-SERVER_IP = gethostbyname(gethostname()) #scapy.get_if_addr(DEV)  # gethostbyname(gethostname())
+SERVER_IP = scapy.get_if_addr(DEV)  # gethostbyname(gethostname()) #gethostbyname(gethostname())
 DICT_THEME = {
     'error': ('red', 'on_grey'),
     'connection': ('grey', 'on_magenta'),
@@ -286,7 +286,7 @@ class server:
         self.tcp_lock.release()# tcp can bigin
         while self.end_time > time(): # run untill time over
             try:
-                udp_socket.sendto(msg, ('<broadcast>', DEFAULT_PORT)) #172.1.255.255
+                udp_socket.sendto(msg, ('172.1.255.255', DEFAULT_PORT)) #<broadcast>
             except timeout:
                 pass
             if self.end_time - time() < 0:
@@ -310,10 +310,10 @@ class server:
         tcp_connection.bind(self.addr)
         # st listing to clients
         tcp_connection.listen()
-        self.udp_lock.release() # udp can start running
-        self.tcp_lock.acquire() # tcp need to be realse by udp
-        self.tcp_lock.release() # free for next run
-        while self.end_time > time(): # run on global time
+        self.udp_lock.release()  # udp can start running
+        self.tcp_lock.acquire()  # tcp need to be realse by udp
+        self.tcp_lock.release()  # free for next run
+        while self.end_time > time():  # run on global time
             try:
                 tcp_connection.settimeout(self.end_time - time())
                 connection_socket, addr = tcp_connection.accept()
@@ -332,8 +332,8 @@ class server:
         """
         name_msg = connection_socket.recv(MAX_BYTE).decode(FORMAT) #  client name
         self.print_in_theme(f"Received offer from {addr[0]},attempting to connect...", 'connection')
-        msg_to_client = "#" # on error (Max player no need)
-        if self.end_time > time(): # global time
+        msg_to_client = "#"  # on error (Max player no need)
+        if self.end_time > time():  # global time
             self.client_connect_lock.acquire()
             has_joined = self.game.add_client(addr, connection_socket, name_msg)
             self.client_connect_lock.release()
