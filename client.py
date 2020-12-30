@@ -7,7 +7,7 @@ from select import select
 MAX_BYTE = 2028
 FORMAT = 'utf-8'
 DISCONNECT_MSG = 'DISCONNECT!'
-DEFAULT_PORT = 13117
+DEFAULT_PORT = 13113
 MAGIC_COOKIE = 'feedbeef'
 DICT_THEME = {
                 'error': ('red', 'on_grey'),
