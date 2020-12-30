@@ -133,25 +133,29 @@ class keyBoardGame:
 
     def start_game_for_player(self, player):
         """
-
+            start the game for each player (in other therads)
         :param player:
         :return:
         """
-        player_ip, player_socket = player
-        distinct_key_counter = {}
-        self.client[player_ip].append(distinct_key_counter)
-        player_socket.send(self.get_welcome_msg().encode(self.format))
-        while self.game_end_time > time():
+        player_ip, player_socket = player # get player msg,addr
+        distinct_key_counter = {} # create key pressed dict we will work with
+        self.client[player_ip].append(distinct_key_counter) # add it to info_list
+        player_socket.send(self.get_welcome_msg().encode(self.format)) # sed welcome msg to client
+        while self.game_end_time > time(): # run untill global time
             try:
-                player_socket.settimeout(self.game_end_time - time())
+                player_socket.settimeout(self.game_end_time - time())  # set delta time to recv
                 key_pressed = str(player_socket.recv(self.message_size).decode(self.format))
-                if key_pressed not in distinct_key_counter.keys():
+                if key_pressed not in distinct_key_counter.keys(): # if we saw the key in user
                     distinct_key_counter[key_pressed] = 0
-                distinct_key_counter[key_pressed] += 1
+                distinct_key_counter[key_pressed] += 1 # inc
             except timeout:
                 pass
 
     def calculate_group_scores(self):
+        """
+            After game over run on all cliets and add to thier team thier point , sum it up
+        :return:
+        """
         # Format of {ip: [port, socket, team_name, group_number,dict{'keyPress': counter}]}
         for ip, info_list in self.client.items():
             distinct_key_counter = info_list[4]
@@ -159,13 +163,17 @@ class keyBoardGame:
             player_sum = sum(distinct_key_counter.values())
             self.score[group_number - 1] += player_sum
             distinct_key_counter.clear()
-            if player_sum > self.best_player_tuple[0] or self.best_player_tuple[0] == 0:
+            if player_sum > self.best_player_tuple[0] or self.best_player_tuple[0] == 0: # update best player
                 self.best_player_tuple = (player_sum, info_list[2])
 
     def end_msg(self):
-        # Format of {ip: [port, socket, team_name, group_number,dict{'keyPress': counter}]}
+        """
+            MSG = all inforamtion about pressed and who wins
+            :return: MSG
+        """
         group1_lst = self.score[0]
         group2_lst = self.score[1]
+        # need to ignore not in use but afrid to delte
         for ip, info_list in self.client.items():
             client_group_name = info_list[2]
             key_pressed_dict = info_list[3]
@@ -189,6 +197,10 @@ class keyBoardGame:
         return message + self.statistic()
 
     def statistic(self):
+        """
+        :return: string with all statistic we collected
+        """
+        #  the best player
         msg = f'BEST PLAYER IN THE WORD IS ........ {self.best_player_tuple[1]} \n'
         return msg
 
@@ -196,8 +208,14 @@ class keyBoardGame:
         client_socket.send(msg)
 
 class server:
-
+    """
+        The class accept deniyu add users
+    """
     def print_in_theme(self, msg, kind):
+        """
+            We did in a cool way but afried it will not work (run in server all good)
+            pritn color text by ,msg
+        """
         #betters colors
         color = ''
         background = ''
@@ -209,16 +227,32 @@ class server:
         print(f'{bcolors.OKCYAN} {msg}{bcolors.ENDC}')
 
     def __init__(self):
-        self.socket = socket(AF_INET, SOCK_STREAM)
-        self.addr = (SERVER_IP, SERVER_PORT)
+        """
+            init all information for the server
+        """
+        self.socket = socket(AF_INET, SOCK_STREAM) # create socket
+        self.addr = (SERVER_IP, SERVER_PORT) # our defualt addr
+        # loocks we will use for threads
         self.udp_lock = Lock()
         self.tcp_lock = Lock()
         self.client_connect_lock = Lock()
+        # create the game
         self.game = keyBoardGame(NUMBER_OF_CLIENTS, FORMAT, MAX_BYTE, WAIT_TIME)
         self.connected_client_socket = []
+        # start server (we dont block main thread)
         Thread(target=self.game_manager, args=()).start()
 
     def game_manager(self):
+        """
+            run untill server close
+            print all coneection and send offer by udp
+            create connection in tcp
+            begin game
+            sum score
+            send client msg
+            re-do
+        :return:
+        """
         while True:
             self.udp_lock.acquire()
             self.tcp_lock.acquire()
@@ -231,19 +265,26 @@ class server:
             self.print_in_theme("Game over, sending out offer requests...", 'disconnect')
 
     def offer_connection_vid_udp(self):
+        """
+            send all my port and ip to connect
+        :return:
+        """
         self.udp_lock.acquire()
         self.udp_lock.release()
+        # create udp socket
         udp_socket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)
         udp_socket.setsockopt(SOL_SOCKET, SO_REUSEPORT, 1)
         udp_socket.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
+        # set time so we will not get stuck (no need)
         udp_socket.settimeout(0.2)
+        # bind the pysical socket with this addr
         udp_socket.bind((SERVER_IP, SERVER_PORT))
+        # set new addr as os createed (change the port)
         self.addr = udp_socket.getsockname()
-        msg = pack('!IbH', 0xfeedbeef, 2, self.addr[1])
-        # msg = bytes.fromhex(MAGIC_COOKIE) + bytes.fromhex(MESSAGE_TYPE) + self.addr[1].to_bytes(2, byteorder='big')
-        self.end_time = time() + WAIT_TIME
-        self.tcp_lock.release()
-        while self.end_time > time():
+        msg = pack('!IbH', 0xfeedbeef, 2, self.addr[1]) # send client my connection port
+        self.end_time = time() + WAIT_TIME # set global wait time
+        self.tcp_lock.release()# tcp can bigin
+        while self.end_time > time(): # run untill time over
             try:
                 udp_socket.sendto(msg, ('<broadcast>', DEFAULT_PORT)) #172.1.255.255
             except timeout:
@@ -257,15 +298,22 @@ class server:
         udp_socket.close()
 
     def create_connection_via_tcp(self):
+        """
+            Create the TCP coonection
+        :return: None
+        """
+        # create tcp connection
         tcp_connection = socket(AF_INET, SOCK_STREAM)
         tcp_connection.settimeout(WAIT_TIME)
         tcp_connection.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
+        # bind socket with addr
         tcp_connection.bind(self.addr)
+        # st listing to clients
         tcp_connection.listen()
-        self.udp_lock.release()
-        self.tcp_lock.acquire()
-        self.tcp_lock.release()
-        while self.end_time > time():
+        self.udp_lock.release() # udp can start running
+        self.tcp_lock.acquire() # tcp need to be realse by udp
+        self.tcp_lock.release() # free for next run
+        while self.end_time > time(): # run on global time
             try:
                 tcp_connection.settimeout(self.end_time - time())
                 connection_socket, addr = tcp_connection.accept()
@@ -276,10 +324,16 @@ class server:
         tcp_connection.close()
 
     def when_client_connected(self, connection_socket, addr):
-        name_msg = connection_socket.recv(MAX_BYTE).decode(FORMAT)
+        """
+            new thread we accept clients and handle them
+        :param connection_socket:
+        :param addr:
+        :return:
+        """
+        name_msg = connection_socket.recv(MAX_BYTE).decode(FORMAT) #  client name
         self.print_in_theme(f"Received offer from {addr[0]},attempting to connect...", 'connection')
-        msg_to_client = "#"
-        if self.end_time > time():
+        msg_to_client = "#" # on error (Max player no need)
+        if self.end_time > time(): # global time
             self.client_connect_lock.acquire()
             has_joined = self.game.add_client(addr, connection_socket, name_msg)
             self.client_connect_lock.release()
@@ -287,6 +341,10 @@ class server:
                 connection_socket.send(msg_to_client.encode(FORMAT))
 
     def free_all_client_socket(self):
+        """
+            run on all clients socket and free them before next run
+        :return:
+        """
         for client_socket in self.connected_client_socket:
             client_socket.close()
 

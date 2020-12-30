@@ -115,5 +115,4 @@ class client:
                 pass
         self.closing_lock.release()
 
-
 client(13117, 'Vladimir Computin')
