@@ -14,11 +14,11 @@ FORMAT = 'utf-8'
 DISCONNECT_MSG = 'DISCONNECT!'
 # MAGIC_COOKIE = 'feedbeef'
 # MESSAGE_TYPE = '02'
-WAIT_TIME = 5
+WAIT_TIME = 10
 SERVER_PORT = 1207  # get free one
 DEFAULT_PORT = 13117
 NUMBER_OF_CLIENTS = 10
-SERVER_IP = scapy.get_if_addr(DEV)  # gethostbyname(gethostname()) #gethostbyname(gethostname())
+SERVER_IP = scapy.get_if_addr(TEST)  # gethostbyname(gethostname()) #gethostbyname(gethostname())
 DICT_THEME = {
     'error': ('red', 'on_grey'),
     'connection': ('grey', 'on_magenta'),
